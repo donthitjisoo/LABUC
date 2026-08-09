@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+data/train_and_validation_sets/**
+data/test_set/**
+runs/**
+!data/train_and_validation_sets/.gitkeep
+!data/test_set/.gitkeep
+!runs/.gitkeep
