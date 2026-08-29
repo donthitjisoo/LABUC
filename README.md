@@ -166,6 +166,12 @@ method are also saved together in `coords.npz` in that folder.
 `--max-points` (default 5000) subsamples before running t-SNE/TriMap/PHATE,
 since those scale poorly to tens of thousands of points.
 
+## Results
+
+Full `runs/` output (checkpoints, history CSVs, confusion matrices, embedding
+plots) is uploaded here rather than committed to the repo:
+[Google Drive folder](https://drive.google.com/drive/folders/1k_55COozL5Racaz8ijJPlHuSvNY-d-p_?usp=drive_link)
+
 ## Notes
 
 - All three models are trained **from scratch** — `weights=None` in
