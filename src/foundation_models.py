@@ -68,7 +68,13 @@ class MedSigLIPExtractor(FoundationExtractor):
 
     @torch.no_grad()
     def embed(self, batch):
-        return self.model.get_image_features(pixel_values=batch.to(self.device))
+        out = self.model.get_image_features(pixel_values=batch.to(self.device))
+        if isinstance(out, torch.Tensor):
+            return out
+        # Some transformers versions return the full vision-model output here
+        # instead of a bare pooled tensor -- unwrap it defensively.
+        pooled = getattr(out, "pooler_output", None)
+        return pooled if pooled is not None else out.last_hidden_state[:, 0]
 
 
 class UNI2Extractor(FoundationExtractor):
