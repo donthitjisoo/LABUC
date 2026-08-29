@@ -60,6 +60,18 @@ def plot_embedding(ax, coords, labels, title):
     ax.set_yticks([])
 
 
+def save_one(method, coords, y, output_dir: Path):
+    fig, ax = plt.subplots(figsize=(6, 6))
+    plot_embedding(ax, coords, y, method.upper())
+    ax.legend(loc="best", fontsize=8)
+    fig.tight_layout()
+    out_path = output_dir / f"{method}.png"
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+    print(f"Saved {out_path}")
+    return out_path
+
+
 def main():
     parser = argparse.ArgumentParser(description="Plot LIMUC feature embeddings with multiple DR methods.")
     parser.add_argument("--features", required=True, help="npz file produced by src/embed.py")
@@ -69,7 +81,8 @@ def main():
     parser.add_argument("--n-neighbors", type=int, default=15, help="UMAP / PaCMAP / TriMap / PHATE")
     parser.add_argument("--max-points", type=int, default=5000,
                          help="Subsample to this many points for speed (t-SNE/TriMap/PHATE scale poorly).")
-    parser.add_argument("--output", default="runs/embeddings/dr_plots.png")
+    parser.add_argument("--output-dir", default="runs/embeddings/dr_plots",
+                         help="Directory to save one PNG per method into.")
     args = parser.parse_args()
 
     data = np.load(args.features, allow_pickle=True)
@@ -81,32 +94,17 @@ def main():
         X, y = X[idx], y[idx]
         print(f"Subsampled to {args.max_points} points for speed.")
 
-    n = len(args.methods)
-    ncols = min(3, n)
-    nrows = -(-n // ncols)
-    fig, axes = plt.subplots(nrows, ncols, figsize=(5 * ncols, 5 * nrows))
-    axes = np.atleast_1d(axes).flatten()
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     coords_out = {}
-    for ax, method in zip(axes, args.methods):
+    for method in args.methods:
         print(f"Running {method} ...")
         coords = METHODS[method](X, args.seed, args.perplexity, args.n_neighbors)
         coords_out[method] = coords
-        plot_embedding(ax, coords, y, method.upper())
+        save_one(method, coords, y, output_dir)
 
-    for ax in axes[len(args.methods):]:
-        ax.axis("off")
-
-    handles, labels_ = axes[0].get_legend_handles_labels()
-    fig.legend(handles, labels_, loc="lower center", ncol=len(CLASS_NAMES))
-    fig.tight_layout(rect=[0, 0.05, 1, 1])
-
-    output_path = Path(args.output)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(output_path, dpi=150)
-    print(f"Saved plot to {output_path}")
-
-    npz_path = output_path.with_suffix(".coords.npz")
+    npz_path = output_dir / "coords.npz"
     np.savez(npz_path, labels=y, **coords_out)
     print(f"Saved raw 2D coordinates to {npz_path}")
 
