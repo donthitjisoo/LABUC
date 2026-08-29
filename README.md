@@ -1,4 +1,4 @@
-# xiaoUC — LIMUC Ulcerative Colitis Severity Classification
+# LABUC — LIMUC Ulcerative Colitis Severity Classification
 
 Training and evaluation pipeline for the [LIMUC dataset](https://zenodo.org/records/5827695)
 (Labeled Images for Ulcerative Colitis), classifying the 4-class Mayo endoscopic
