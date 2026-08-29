@@ -79,11 +79,29 @@ class UNI2Extractor(FoundationExtractor):
         import timm
         from timm.data import resolve_data_config
         from timm.data.transforms_factory import create_transform
-        self.model = timm.create_model(f"hf-hub:{self.hf_id}", pretrained=True).to(device).eval()
+        # Required per the UNI2-h model card -- without these, timm's hub auto-config
+        # picks the wrong base architecture (e.g. vit_giant_patch14_224) and the
+        # checkpoint's position embeddings fail to resample correctly.
+        timm_kwargs = {
+            "img_size": 224,
+            "patch_size": 14,
+            "depth": 24,
+            "num_heads": 24,
+            "init_values": 1e-5,
+            "embed_dim": 1536,
+            "mlp_ratio": 2.66667 * 2,
+            "num_classes": 0,
+            "no_embed_class": True,
+            "mlp_layer": timm.layers.SwiGLUPacked,
+            "act_layer": torch.nn.SiLU,
+            "reg_tokens": 8,
+            "dynamic_img_size": True,
+        }
+        self.model = timm.create_model(f"hf-hub:{self.hf_id}", pretrained=True, **timm_kwargs).to(device).eval()
         config = resolve_data_config(self.model.pretrained_cfg, model=self.model)
         self.transform = create_transform(**config)
         self.device = device
-        self.embed_dim = self.model.num_features
+        self.embed_dim = 1536
 
     def preprocess(self, image):
         return self.transform(image)
