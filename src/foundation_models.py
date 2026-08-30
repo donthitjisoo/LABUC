@@ -10,6 +10,9 @@ Model pages:
   - UNI2-h:          https://huggingface.co/MahmoodLab/UNI2-h  (approval requires
                       your HF account email to match an institutional address)
 
+EndoViT (https://huggingface.co/egeozsoy/EndoViT) is the one exception --
+Apache 2.0, publicly downloadable, no login/access request needed.
+
 EndoDINO (arXiv:2501.05488) has NO public checkpoint release as of this
 writing -- EndoDINOExtractor is a stub; fill it in if you obtain private
 weights directly from the authors.
@@ -117,6 +120,54 @@ class UNI2Extractor(FoundationExtractor):
         return self.model(batch.to(self.device))
 
 
+class EndoViTExtractor(FoundationExtractor):
+    """MAE-pretrained ViT-Base/16 on endoscopy images. Public, non-gated
+    (Apache 2.0) -- no Hugging Face login required."""
+    name = "endovit"
+    hf_id = "egeozsoy/EndoViT"
+    # EndoViT's own dataset statistics (not ImageNet mean/std), per the model card.
+    MEAN = [0.3464, 0.2280, 0.2228]
+    STD = [0.2520, 0.2128, 0.2093]
+
+    def __init__(self, device):
+        from functools import partial
+        from pathlib import Path
+
+        import torch.nn as nn
+        from huggingface_hub import snapshot_download
+        from timm.models.vision_transformer import VisionTransformer
+        from torchvision import transforms
+
+        model_dir = snapshot_download(repo_id=self.hf_id, revision="main")
+        weights_path = Path(model_dir) / "pytorch_model.bin"
+
+        # num_classes=0 drops the classification head so forward() returns the
+        # pooled 768-dim embedding directly; the checkpoint only has MAE-encoder
+        # weights anyway, so strict=False just ignores any head/decoder mismatch.
+        self.model = VisionTransformer(
+            patch_size=16, embed_dim=768, depth=12, num_heads=12, mlp_ratio=4,
+            qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), num_classes=0,
+        )
+        state_dict = torch.load(weights_path, map_location="cpu")["model"]
+        self.model.load_state_dict(state_dict, strict=False)
+        self.model = self.model.to(device).eval()
+        self.device = device
+        self.embed_dim = 768
+
+        self.transform = transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize(self.MEAN, self.STD),
+        ])
+
+    def preprocess(self, image):
+        return self.transform(image)
+
+    @torch.no_grad()
+    def embed(self, batch):
+        return self.model(batch.to(self.device))
+
+
 class EndoDINOExtractor(FoundationExtractor):
     """Stub: EndoDINO has no public checkpoint. Point --endodino-checkpoint at
     weights you've obtained directly from the paper's authors and adapt
@@ -141,5 +192,6 @@ REGISTRY = {
     "dinov3_vitl16": DINOv3Extractor,
     "medsiglip_448": MedSigLIPExtractor,
     "uni2_h": UNI2Extractor,
+    "endovit": EndoViTExtractor,
     "endodino": EndoDINOExtractor,
 }
