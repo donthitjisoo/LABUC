@@ -37,11 +37,13 @@ class FoundationExtractor:
 class DINOv3Extractor(FoundationExtractor):
     name = "dinov3_vitl16"
     hf_id = "facebook/dinov3-vitl16-pretrain-lvd1689m"
+    torch_dtype = None  # fp32 default; the 7B subclass below overrides this
 
     def __init__(self, device):
         from transformers import AutoImageProcessor, AutoModel
         self.processor = AutoImageProcessor.from_pretrained(self.hf_id)
-        self.model = AutoModel.from_pretrained(self.hf_id).to(device).eval()
+        kwargs = {"torch_dtype": self.torch_dtype} if self.torch_dtype is not None else {}
+        self.model = AutoModel.from_pretrained(self.hf_id, **kwargs).to(device).eval()
         self.device = device
         self.embed_dim = self.model.config.hidden_size
 
@@ -50,9 +52,22 @@ class DINOv3Extractor(FoundationExtractor):
 
     @torch.no_grad()
     def embed(self, batch):
-        out = self.model(pixel_values=batch.to(self.device))
+        pixel_values = batch.to(self.device)
+        if self.torch_dtype is not None:
+            pixel_values = pixel_values.to(self.torch_dtype)
+        out = self.model(pixel_values=pixel_values)
         pooled = getattr(out, "pooler_output", None)
-        return pooled if pooled is not None else out.last_hidden_state[:, 0]
+        pooled = pooled if pooled is not None else out.last_hidden_state[:, 0]
+        return pooled.float()
+
+
+class DINOv3_7B_Extractor(DINOv3Extractor):
+    """~6.7B params ("7B"), embed dim 4096. Same gated Meta license/access flow
+    as the ViT-L. Loaded in fp16 by default (~13.4GB of weights) since fp32
+    would need ~27GB just for the weights -- still needs a sizeable GPU."""
+    name = "dinov3_vit7b16"
+    hf_id = "facebook/dinov3-vit7b16-pretrain-lvd1689m"
+    torch_dtype = torch.float16
 
 
 class MedSigLIPExtractor(FoundationExtractor):
@@ -193,6 +208,7 @@ class EndoDINOExtractor(FoundationExtractor):
 
 REGISTRY = {
     "dinov3_vitl16": DINOv3Extractor,
+    "dinov3_vit7b16": DINOv3_7B_Extractor,
     "medsiglip_448": MedSigLIPExtractor,
     "uni2_h": UNI2Extractor,
     "endovit": EndoViTExtractor,

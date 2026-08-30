@@ -134,21 +134,30 @@ python src/embed.py --features-mode foundation --foundation-model dinov3_vitl16 
 Each run writes a `.npz` (features + Mayo labels + patient ids + split) to
 `runs/embeddings/<name>_features.npz`.
 
-**Foundation models** (`--foundation-model {dinov3_vitl16, medsiglip_448, uni2_h, endovit}`):
+**Foundation models** (`--foundation-model {dinov3_vitl16, dinov3_vit7b16, medsiglip_448, uni2_h, endovit}`):
 
-| Model | Gated? | Notes |
-|---|---|---|
-| [DINOv3 ViT-L/16](https://huggingface.co/facebook/dinov3-vitl16-pretrain-lvd1689m) | Yes | accept license on the model page |
-| [MedSigLIP-448](https://huggingface.co/google/medsiglip-448) | Yes | approval is near-instant |
-| [UNI2-h](https://huggingface.co/MahmoodLab/UNI2-h) | Yes | account email must match an institutional address; approval isn't instant |
-| [EndoViT](https://huggingface.co/egeozsoy/EndoViT) | **No** | Apache 2.0, public, no login needed |
+| Model | Params | Embed dim | Gated? | Notes |
+|---|---|---|---|---|
+| [DINOv3 ViT-L/16](https://huggingface.co/facebook/dinov3-vitl16-pretrain-lvd1689m) (`dinov3_vitl16`) | ~300M | 1024 | Yes | accept license on the model page |
+| [DINOv3 ViT-7B/16](https://huggingface.co/facebook/dinov3-vit7b16-pretrain-lvd1689m) (`dinov3_vit7b16`) | ~6.7B | 4096 | Yes | same license/access flow as the ViT-L; loaded in **fp16** by default (~13.4GB of weights -- fp32 would need ~27GB) |
+| [MedSigLIP-448](https://huggingface.co/google/medsiglip-448) | ~400M (vision tower) | 1152 | Yes | approval is near-instant |
+| [UNI2-h](https://huggingface.co/MahmoodLab/UNI2-h) | ~681M | 1536 | Yes | account email must match an institutional address; approval isn't instant |
+| [EndoViT](https://huggingface.co/egeozsoy/EndoViT) | ~86M | 768 | **No** | Apache 2.0, public, no login needed |
 
-For the three gated ones:
+Both DINOv3 sizes share the same `DINOv3Extractor` code path in
+`foundation_models.py` (`dinov3_vit7b16` is just a subclass pointing at the
+7B checkpoint with `torch_dtype=float16`) -- pick whichever fits your
+hardware via `--foundation-model`.
+
+For the gated ones (everything except EndoViT):
 1. Log into Hugging Face with your own account and accept the license /
    access request on the model's page.
 2. Authenticate locally: `huggingface-cli login`, or set `export HF_TOKEN=hf_...`.
-3. First run downloads the weights (DINOv3-L ≈1.2GB, MedSigLIP ≈1.6GB, UNI2-h ≈2.7GB,
-   EndoViT ≈330MB).
+3. First run downloads the weights (DINOv3-L ≈1.2GB, **DINOv3-7B ≈13.4GB in fp16**,
+   MedSigLIP ≈1.6GB, UNI2-h ≈2.7GB, EndoViT ≈330MB).
+
+The 7B model needs a sizeable GPU even in fp16 -- use a small `--batch-size`
+(e.g. `4` or lower) and expect it to be slow or infeasible on CPU/MPS.
 
 EndoViT needs none of that — `--foundation-model endovit` just works once
 `requirements.txt` is installed.
