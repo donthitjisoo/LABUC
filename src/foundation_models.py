@@ -148,7 +148,10 @@ class EndoViTExtractor(FoundationExtractor):
             patch_size=16, embed_dim=768, depth=12, num_heads=12, mlp_ratio=4,
             qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), num_classes=0,
         )
-        state_dict = torch.load(weights_path, map_location="cpu")["model"]
+        # weights_only=False: this checkpoint (from the official egeozsoy/EndoViT
+        # repo) bundles an argparse.Namespace of training args alongside the
+        # model weights, which PyTorch >=2.6's default safe unpickler rejects.
+        state_dict = torch.load(weights_path, map_location="cpu", weights_only=False)["model"]
         self.model.load_state_dict(state_dict, strict=False)
         self.model = self.model.to(device).eval()
         self.device = device
