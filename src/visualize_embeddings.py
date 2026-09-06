@@ -16,29 +16,37 @@ from sklearn.manifold import TSNE
 CLASS_NAMES = ["Mayo 0", "Mayo 1", "Mayo 2", "Mayo 3"]
 CLASS_COLORS = ["#4c72b0", "#55a868", "#dd8452", "#c44e52"]
 
+# Fixed across every run/method/feature-set so plots stay comparable and
+# reproducible -- intentionally not a CLI flag.
+SEED = 42
 
-def run_tsne(X, seed, perplexity, n_neighbors):
-    return TSNE(n_components=2, random_state=seed, perplexity=perplexity, init="pca").fit_transform(X)
+
+def run_tsne(X, perplexity, n_neighbors):
+    return TSNE(n_components=2, random_state=SEED, perplexity=perplexity, init="pca").fit_transform(X)
 
 
-def run_umap(X, seed, perplexity, n_neighbors):
+def run_umap(X, perplexity, n_neighbors):
     import umap
-    return umap.UMAP(n_components=2, random_state=seed, n_neighbors=n_neighbors).fit_transform(X)
+    return umap.UMAP(n_components=2, random_state=SEED, n_neighbors=n_neighbors).fit_transform(X)
 
 
-def run_pacmap(X, seed, perplexity, n_neighbors):
+def run_pacmap(X, perplexity, n_neighbors):
     import pacmap
-    return pacmap.PaCMAP(n_components=2, n_neighbors=n_neighbors, random_state=seed).fit_transform(X)
+    return pacmap.PaCMAP(n_components=2, n_neighbors=n_neighbors, random_state=SEED).fit_transform(X)
 
 
-def run_trimap(X, seed, perplexity, n_neighbors):
+def run_trimap(X, perplexity, n_neighbors):
     import trimap
+    # TRIMAP has no random_state argument in this version; it draws its
+    # triplet sampling from NumPy's global RNG, so seed that directly to
+    # keep it reproducible like the other methods.
+    np.random.seed(SEED)
     return trimap.TRIMAP(n_inliers=n_neighbors).fit_transform(X)
 
 
-def run_phate(X, seed, perplexity, n_neighbors):
+def run_phate(X, perplexity, n_neighbors):
     import phate
-    return phate.PHATE(n_components=2, knn=n_neighbors, random_state=seed, verbose=False).fit_transform(X)
+    return phate.PHATE(n_components=2, knn=n_neighbors, random_state=SEED, verbose=False).fit_transform(X)
 
 
 METHODS = {
@@ -76,7 +84,6 @@ def main():
     parser = argparse.ArgumentParser(description="Plot LIMUC feature embeddings with multiple DR methods.")
     parser.add_argument("--features", required=True, help="npz file produced by src/embed.py")
     parser.add_argument("--methods", nargs="+", default=list(METHODS.keys()), choices=list(METHODS.keys()))
-    parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--perplexity", type=float, default=30.0, help="t-SNE only")
     parser.add_argument("--n-neighbors", type=int, default=15, help="UMAP / PaCMAP / TriMap / PHATE")
     parser.add_argument("--max-points", type=int, default=5000,
@@ -87,11 +94,15 @@ def main():
 
     data = np.load(args.features, allow_pickle=True)
     X, y = data["features"], data["labels"]
+    patient_ids = data["patient_ids"] if "patient_ids" in data else np.array([""] * len(y))
+    paths = data["paths"] if "paths" in data else np.array([""] * len(y))
+    splits = data["splits"] if "splits" in data else np.array([""] * len(y))
 
     if X.shape[0] > args.max_points:
-        rng = np.random.default_rng(args.seed)
+        rng = np.random.default_rng(SEED)
         idx = rng.choice(X.shape[0], args.max_points, replace=False)
         X, y = X[idx], y[idx]
+        patient_ids, paths, splits = patient_ids[idx], paths[idx], splits[idx]
         print(f"Subsampled to {args.max_points} points for speed.")
 
     output_dir = Path(args.output_dir)
@@ -100,12 +111,12 @@ def main():
     coords_out = {}
     for method in args.methods:
         print(f"Running {method} ...")
-        coords = METHODS[method](X, args.seed, args.perplexity, args.n_neighbors)
+        coords = METHODS[method](X, args.perplexity, args.n_neighbors)
         coords_out[method] = coords
         save_one(method, coords, y, output_dir)
 
     npz_path = output_dir / "coords.npz"
-    np.savez(npz_path, labels=y, **coords_out)
+    np.savez(npz_path, labels=y, patient_ids=patient_ids, paths=paths, splits=splits, **coords_out)
     print(f"Saved raw 2D coordinates to {npz_path}")
 
 

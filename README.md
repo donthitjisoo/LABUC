@@ -178,10 +178,40 @@ python src/visualize_embeddings.py --features runs/embeddings/raw_features.npz \
 Runs t-SNE, UMAP, PaCMAP, TriMap, and PHATE (`--methods` to pick a subset),
 saving each as its own PNG (`tsne.png`, `umap.png`, ...) into `--output-dir`
 as soon as it finishes, colored by Mayo class. Raw 2D coordinates for every
-method are also saved together in `coords.npz` in that folder.
+method, plus each point's patient id / file path / split, are saved together
+in `coords.npz` in that folder.
 
 `--max-points` (default 5000) subsamples before running t-SNE/TriMap/PHATE,
 since those scale poorly to tens of thousands of points.
+
+**The random seed is a fixed constant (`SEED = 42` in the script), not a CLI
+flag** — every method, every run, every feature set uses the same seed, so
+plots stay reproducible and visually comparable across models. This includes
+TriMap, which has no `random_state` parameter of its own; it's made
+reproducible by seeding NumPy's global RNG right before calling it.
+
+### 5c. Cluster the PaCMAP layout into subsets (`src/cluster_pacmap.py`)
+
+Finds the blobs visible in the PaCMAP plot and turns them into actual data
+subsets, rather than just something to look at:
+
+```bash
+python src/cluster_pacmap.py --coords runs/embeddings/dr_plots_raw/coords.npz
+```
+
+Runs HDBSCAN on the 2D PaCMAP coordinates (density-based, so it infers the
+number of clusters instead of requiring one like k-means, and — unlike a
+fixed-`eps` DBSCAN — isn't thrown off by PaCMAP's arbitrary coordinate
+scale). Points HDBSCAN can't confidently place are labeled `-1` ("noise")
+rather than forced into a cluster. `--min-cluster-size` (default 25)
+controls how large a group has to be to count.
+
+Output, next to `coords.npz`:
+- `pacmap_clusters.png` — the PaCMAP layout recolored by cluster instead of Mayo class
+- `pacmap_clusters.csv` — every point with its cluster id, path, patient id, Mayo label, split
+- `pacmap_clusters/cluster_<id>.csv` (+ `noise.csv`) — one subset file per cluster
+- `pacmap_clusters_vs_mayo.csv` — cluster × Mayo-class counts, to sanity-check whether a
+  cluster tracks disease severity or looks like a batch/scanner effect instead
 
 ## Results
 

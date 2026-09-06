@@ -153,6 +153,7 @@ def main():
 
     labels = np.array([s.label for s in all_samples])
     patient_ids = np.array([s.patient_id for s in all_samples])
+    paths = np.array([str(s.path) for s in all_samples])
     splits = np.array(splits)
 
     if args.features_mode == "raw":
@@ -173,7 +174,8 @@ def main():
 
     output_path = Path(args.output or default_out)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    np.savez(output_path, features=features, labels=labels, patient_ids=patient_ids, splits=splits)
+    np.savez(output_path, features=features, labels=labels, patient_ids=patient_ids,
+             paths=paths, splits=splits)
     print(f"Saved {features.shape[0]} feature vectors (dim={features.shape[1]}) to {output_path}")
 
 
