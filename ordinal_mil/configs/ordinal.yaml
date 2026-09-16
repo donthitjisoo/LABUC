@@ -1,0 +1,14 @@
+# Ablation B: ordinal (CORAL cutpoint) head on the global CLS token only.
+# No MIL, no ranking loss -- isolates the effect of switching from plain CE
+# to ordinal structure before adding anything else.
+experiment_name: B_ordinal
+
+model:
+  head_type: ordinal
+  ordinal_head_type: coral
+  use_mil: false
+
+loss:
+  use_ranking: false
+  lambda_ordinal: 1.0
+  lambda_reg: 0.15

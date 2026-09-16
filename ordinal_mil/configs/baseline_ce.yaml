@@ -1,0 +1,9 @@
+# Ablation A: plain 4-way cross-entropy baseline. No ordinal structure, no MIL.
+experiment_name: A_baseline_ce
+
+model:
+  head_type: ce
+  use_mil: false
+
+loss:
+  use_ranking: false
