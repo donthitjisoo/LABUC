@@ -1,0 +1,17 @@
+# Ablation C: ordinal + ranking. Still global-CLS-only (no MIL) -- isolates
+# the ranking loss's contribution on its own before combining with MIL.
+experiment_name: C_ordinal_rank
+
+model:
+  head_type: ordinal
+  ordinal_head_type: coral
+  use_mil: false
+
+loss:
+  use_ranking: true
+  lambda_ordinal: 1.0
+  lambda_rank: 0.25
+  lambda_reg: 0.15
+  ranking:
+    margin: 0.3
+    pairs_per_delta: {1: 12, 2: 6, 3: 3}

@@ -1,0 +1,15 @@
+# Ablation D: ordinal + MIL (gated attention), no ranking loss yet --
+# isolates MIL's contribution on its own before combining with ranking.
+experiment_name: D_ordinal_mil
+
+model:
+  head_type: ordinal
+  ordinal_head_type: coral
+  use_mil: true
+  pooling: gated_attention
+  mil_attn_dim: 128
+
+loss:
+  use_ranking: false
+  lambda_ordinal: 1.0
+  lambda_reg: 0.15

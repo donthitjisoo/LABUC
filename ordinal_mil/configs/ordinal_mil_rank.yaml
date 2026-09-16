@@ -1,0 +1,21 @@
+# Ablation E: ordinal + MIL + ranking -- the PRIMARY PROPOSED MODEL for this
+# pass. Latent prototypes (F) and contrastive learning (G) are deliberately
+# NOT included here; they're separate ablations layered on top of this one
+# once it's verified, not part of the baseline "full" model.
+experiment_name: E_ordinal_mil_rank
+
+model:
+  head_type: ordinal
+  ordinal_head_type: coral
+  use_mil: true
+  pooling: gated_attention
+  mil_attn_dim: 128
+
+loss:
+  use_ranking: true
+  lambda_ordinal: 1.0
+  lambda_rank: 0.25
+  lambda_reg: 0.15
+  ranking:
+    margin: 0.3
+    pairs_per_delta: {1: 12, 2: 6, 3: 3}

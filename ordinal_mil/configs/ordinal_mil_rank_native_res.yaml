@@ -1,0 +1,27 @@
+# Resolution ablation companion to E: same model/loss config, but input size
+# preserves LIMUC's native ~352x288 resolution (padded to a patch14 multiple)
+# instead of downsampling to the usual 224x224. Compare directly against
+# ordinal_mil_rank.yaml's 256-patch grid -- do NOT interpret either result
+# without the other; this is specifically to test whether preserving native
+# resolution (546 patches) helps focal-lesion discrimination, not to declare
+# a winner by assumption.
+experiment_name: E_ordinal_mil_rank_native_res
+
+data:
+  image_size: [294, 364]  # [H, W], 21x26 = 546 patches at patch_size=14
+
+model:
+  head_type: ordinal
+  ordinal_head_type: coral
+  use_mil: true
+  pooling: gated_attention
+  mil_attn_dim: 128
+
+loss:
+  use_ranking: true
+  lambda_ordinal: 1.0
+  lambda_rank: 0.25
+  lambda_reg: 0.15
+  ranking:
+    margin: 0.3
+    pairs_per_delta: {1: 12, 2: 6, 3: 3}
