@@ -1,9 +1,25 @@
 .venv/
 __pycache__/
 *.pyc
+
+# The original LIMUC data locations -- explicit, so it's unambiguous these
+# two are always ignored regardless of the general rule below.
 data/train_and_validation_sets/**
 data/test_set/**
+
+# Any "data" directory anywhere in the repo, at any depth, no matter where
+# it's derived from (root data/, ordinal_mil/data/, or any future copy) --
+# ignored recursively. Directories themselves stay trackable (so structure
+# survives) via the directory-only negation below.
+**/data/**
+!**/data/**/
+
+# Training/eval outputs, same treatment.
 runs/**
-!data/train_and_validation_sets/.gitkeep
-!data/test_set/.gitkeep
-!runs/.gitkeep
+!runs/**/
+ordinal_mil/runs_ordinal_mil/**
+!ordinal_mil/runs_ordinal_mil/**/
+
+# .gitkeep placeholders are always kept, anywhere, now that the directories
+# containing them are traversable again.
+!**/.gitkeep
