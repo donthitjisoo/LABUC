@@ -10,6 +10,9 @@ score (0–3) from colonoscopy images. Includes:
 - Dimensionality-reduction visualization of the dataset (t-SNE, UMAP, PaCMAP,
   TriMap, PHATE) using raw pixels, your own trained backbones, or pretrained
   foundation models (DINOv3, MedSigLIP, UNI2-h).
+- A separate, more ambitious research pipeline (`ordinal_mil/`) testing
+  ordinal + patch-level MIL modeling for adjacent-Mayo-grade discrimination —
+  see [§6](#6-ordinal-lesion-aware-research-pipeline-ordinal_mil) below.
 
 ## Repository layout
 
@@ -26,7 +29,9 @@ src/
   embed.py                   # extract feature vectors (raw / trained backbone / foundation model)
   foundation_models.py       # DINOv3, MedSigLIP, UNI2-h, (stub) EndoDINO loaders
   visualize_embeddings.py    # t-SNE / UMAP / PaCMAP / TriMap / PHATE plots from embed.py output
+  cluster_pacmap.py          # HDBSCAN clustering of the PaCMAP layout into subsets
 runs/                        # all training/evaluation/embedding outputs land here
+ordinal_mil/                 # separate research pipeline -- see its own README.md
 ```
 
 ## 1. Setup
@@ -212,6 +217,28 @@ Output, next to `coords.npz`:
 - `pacmap_clusters/cluster_<id>.csv` (+ `noise.csv`) — one subset file per cluster
 - `pacmap_clusters_vs_mayo.csv` — cluster × Mayo-class counts, to sanity-check whether a
   cluster tracks disease severity or looks like a batch/scanner effect instead
+
+## 6. Ordinal, lesion-aware research pipeline (`ordinal_mil/`)
+
+A separate, self-contained pipeline testing a different, more ambitious
+question than the from-scratch CNN baselines above:
+
+> Can patch-level lesion-aware ordinal modeling improve discrimination
+> between **adjacent** Mayo Endoscopic Scores (0↔1, 1↔2, 2↔3) — the
+> boundaries that matter clinically — rather than just raw accuracy?
+
+It uses a frozen DINOv2 (or EndoViT) backbone, a CORAL-style ordinal
+cutpoint head with a continuous latent severity score, optional
+gated-attention multiple-instance-learning (MIL) patch pooling, and an
+adjacent-weighted ranking loss — trained and compared across six ablation
+configurations (plain cross-entropy baseline through the full proposed
+model, plus a native-resolution variant). It does not share code or `runs/`
+output with the rest of this repo, and has its own requirements, configs,
+training/evaluation scripts, and results.
+
+See [`ordinal_mil/README.md`](ordinal_mil/README.md) for the full design,
+setup, and usage — this section is just a pointer so the top-level layout
+above makes sense.
 
 ## Results
 
