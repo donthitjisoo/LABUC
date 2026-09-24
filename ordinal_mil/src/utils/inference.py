@@ -27,8 +27,13 @@ def run_inference(model, loader, device, capture_attn: bool = False) -> Dict[str
         all_y.append(y.numpy())
         all_patient.extend(patient_ids)
         all_path.extend(paths)
+        # z and ordinal_logits are captured independently: head_type=="cdw_ce"
+        # produces z (for tuned-threshold classification / ranking / reg)
+        # WITHOUT ordinal_logits (it classifies via ce_logits instead), so
+        # these must not be assumed to co-occur.
         if "z" in out:
             all_z.append(out["z"].cpu().numpy())
+        if "ordinal_logits" in out:
             all_probs.append(torch.sigmoid(out["ordinal_logits"]).cpu().numpy())
         if "ce_logits" in out:
             all_ce_logits.append(out["ce_logits"].cpu().numpy())
@@ -43,6 +48,7 @@ def run_inference(model, loader, device, capture_attn: bool = False) -> Dict[str
     }
     if all_z:
         result["z"] = np.concatenate(all_z).reshape(-1)
+    if all_probs:
         result["probs"] = np.concatenate(all_probs)  # [N,3] = P(Y>0), P(Y>1), P(Y>2)
     if all_ce_logits:
         result["ce_logits"] = np.concatenate(all_ce_logits)
@@ -53,12 +59,14 @@ def run_inference(model, loader, device, capture_attn: bool = False) -> Dict[str
 
 
 def classify_default(result: Dict[str, np.ndarray], head_type: str) -> np.ndarray:
-    """Each head's own native decision rule at probability 0.5. For the
-    ordinal head this is mathematically identical to classifying by z against
-    that head's own trained cutpoints (sigmoid(scale*(z-tau))>0.5 <=> z>tau),
-    NOT an arbitrary fixed number -- it's "whatever training converged to."
+    """Each head's own native decision rule. For "ce" and "cdw_ce" that's
+    argmax over the 4-way softmax; for "ordinal" it's probability 0.5 on
+    each cumulative threshold, which is mathematically identical to
+    classifying by z against that head's own trained cutpoints
+    (sigmoid(scale*(z-tau))>0.5 <=> z>tau) -- NOT an arbitrary fixed number,
+    it's "whatever training converged to."
     """
-    if head_type == "ce":
+    if head_type in ("ce", "cdw_ce"):
         return result["ce_logits"].argmax(axis=1)
     return (result["probs"] > 0.5).sum(axis=1)
 
