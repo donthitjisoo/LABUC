@@ -11,10 +11,16 @@ import torch
 
 
 @torch.no_grad()
-def run_inference(model, loader, device) -> Dict[str, np.ndarray]:
+def run_inference(model, loader, device, capture_attn: bool = False) -> Dict[str, np.ndarray]:
+    """capture_attn: also collect MIL attention weights per image (only
+    meaningful for configs with use_mil=True -- ignored otherwise). Off by
+    default since it's extra memory/IO most callers (e.g. per-epoch
+    validation during training) don't need.
+    """
     model.eval()
     all_y, all_patient, all_path = [], [], []
     all_z, all_probs, all_ce_logits = [], [], []
+    all_attn, grid_hw = [], None
 
     for images, y, patient_ids, paths in loader:
         out = model(images.to(device))
@@ -26,6 +32,9 @@ def run_inference(model, loader, device) -> Dict[str, np.ndarray]:
             all_probs.append(torch.sigmoid(out["ordinal_logits"]).cpu().numpy())
         if "ce_logits" in out:
             all_ce_logits.append(out["ce_logits"].cpu().numpy())
+        if capture_attn and "attn" in out:
+            all_attn.append(out["attn"].cpu().numpy())
+            grid_hw = out["grid_hw"]
 
     result: Dict[str, np.ndarray] = {
         "y_true": np.concatenate(all_y),
@@ -37,6 +46,9 @@ def run_inference(model, loader, device) -> Dict[str, np.ndarray]:
         result["probs"] = np.concatenate(all_probs)  # [N,3] = P(Y>0), P(Y>1), P(Y>2)
     if all_ce_logits:
         result["ce_logits"] = np.concatenate(all_ce_logits)
+    if all_attn:
+        result["attn"] = np.concatenate(all_attn)  # [N, num_patches]
+        result["grid_hw"] = np.array(grid_hw)       # (grid_h, grid_w), constant across the run
     return result
 
 
