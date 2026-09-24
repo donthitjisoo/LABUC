@@ -97,6 +97,20 @@ so no head in the current model depends on them.
 | D — Ordinal + MIL | ✓ | ✓ | ✗ | `configs/ordinal_mil.yaml` |
 | **E — Ordinal + MIL + rank (proposed)** | ✓ | ✓ | ✓ | `configs/ordinal_mil_rank.yaml` |
 | E, native-resolution variant | ✓ | ✓ | ✓ | `configs/ordinal_mil_rank_native_res.yaml` (294×364, 546 patches vs 224×224's 256) |
+| B2 — CDW-CE (analog of B) | ✓ (CDW-CE, not CORAL) | ✗ | ✗ | `configs/cdw_ce.yaml` |
+| D2 — CDW-CE + MIL (analog of D) | ✓ | ✓ | ✗ | `configs/cdw_ce_mil.yaml` |
+| E2 — CDW-CE + MIL + rank (analog of E) | ✓ | ✓ | ✓ | `configs/cdw_ce_mil_rank.yaml` |
+
+**CDW-CE** (class-distance-weighted cross-entropy, de la Torre et al. 2018,
+used for LIMUC MES grading in Polat et al.'s baseline) is now a third
+`model.head_type` option alongside `ce` and `ordinal` — a different way of
+encoding ordinality (penalize softmax probability mass on far classes more
+than near ones) versus the CORAL cutpoint-on-z approach. It reuses the same
+4-way softmax head as the plain CE baseline but *also* exposes a severity
+`z` (via an auxiliary head), so — unlike plain CE — it can be combined with
+MIL and the ranking/regression losses in the same ablation shape as B/D/E,
+not just as a standalone baseline. `loss.cdw_alpha` (default 5.0) controls
+the distance-penalty exponent.
 
 **F (latent prototype discovery) and G (ordinal contrastive loss) are still
 deliberately deferred**, now for a second reason beyond the original
@@ -210,6 +224,22 @@ image_path, true_mayo, predicted_mayo, severity_z, prob_gt0/1/2) and
 next to the checkpoint it was given.
 
 Requires Python 3.9+ (3.10 recommended) — same as the rest of this repo.
+
+### Seeds: selectable, and split from training stochasticity
+
+`seed` (top-level, default 42) is a plain config field — fully selectable,
+not hardcoded — controlling model init, the patient-aware balanced sampler,
+ranking-pair sampling, and bootstrap-CI resampling.
+
+`data.split_seed` (default 42, same value, independent field) controls
+*only* the patient train/val partition. These are deliberately separate:
+changing `seed` alone (e.g. for a multi-seed robustness check, re-running
+the same config with `seed: 7`, `seed: 123`, ...) reruns training with
+different stochasticity while keeping the exact same patient split — so a
+robustness check actually isolates training-noise variance, rather than
+also silently reshuffling which patients are in validation each time.
+Override `data.split_seed` too only if you deliberately want a different
+split.
 
 ## Not yet implemented (next up)
 

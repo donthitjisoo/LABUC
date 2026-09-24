@@ -1,0 +1,15 @@
+# CDW-CE analog of B (ordinal.yaml): class-distance-weighted cross-entropy
+# on the global CLS token only, no MIL, no ranking. Same 4-way softmax head
+# as baseline_ce.yaml, but the loss additionally penalizes probability mass
+# placed on classes far from the true one (weighted by |i-y|^alpha).
+experiment_name: B2_cdw_ce
+
+model:
+  head_type: cdw_ce
+  use_mil: false
+
+loss:
+  use_ranking: false
+  lambda_ordinal: 1.0  # weight on CDW-CE itself
+  lambda_reg: 0.15
+  cdw_alpha: 5.0
