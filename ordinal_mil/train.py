@@ -24,7 +24,7 @@ from src.datasets.limuc import (
     print_split_coverage,
     validate_coverage,
 )
-from src.losses.ordinal import OrdinalCoralLoss, RegressionLoss, WeightedCELoss, build_class_weights
+from src.losses.ordinal import CDWCELoss, OrdinalCoralLoss, RegressionLoss, WeightedCELoss, build_class_weights
 from src.losses.ranking import RankingLoss
 from src.metrics.metrics import compute_metrics, tune_thresholds_for_qwk
 from src.models.mayo_mil import MayoMIL
@@ -39,7 +39,7 @@ def build_records(cfg: dict):
     else:
         all_records = load_from_directory(cfg["data"]["train_val_root"])
     train_records, val_records = patient_group_holdout_split(
-        all_records, val_fraction=cfg["data"]["val_fraction"], seed=cfg["seed"]
+        all_records, val_fraction=cfg["data"]["val_fraction"], seed=cfg["data"]["split_seed"]
     )
     splits = {"train": train_records, "val": val_records}
     print_split_coverage(splits)
@@ -79,19 +79,29 @@ def build_losses(cfg: dict, train_records, device):
     if class_weights is not None:
         class_weights = class_weights.to(device)
 
+    head_type = cfg["model"]["head_type"]
     losses = {}
-    if cfg["model"]["head_type"] == "ce":
+
+    if head_type == "ce":
         losses["cls"] = WeightedCELoss(class_weights)
-    else:
+        return losses  # no z -> no reg/rank losses possible (enforced in config.py)
+
+    if head_type == "cdw_ce":
+        losses["cls"] = CDWCELoss(
+            num_classes=4, alpha=cfg["loss"]["cdw_alpha"], class_weights=class_weights,
+        ).to(device)
+    else:  # ordinal
         losses["ordinal"] = OrdinalCoralLoss(class_weights).to(device)
-        if cfg["loss"]["lambda_reg"] > 0:
-            losses["reg"] = RegressionLoss()
-        if cfg["loss"]["use_ranking"]:
-            losses["rank"] = RankingLoss(
-                margin=cfg["loss"]["ranking"]["margin"],
-                pairs_per_delta={int(k): v for k, v in cfg["loss"]["ranking"]["pairs_per_delta"].items()},
-                seed=cfg["seed"],
-            )
+
+    # Shared by both cdw_ce and ordinal, since both expose z.
+    if cfg["loss"]["lambda_reg"] > 0:
+        losses["reg"] = RegressionLoss()
+    if cfg["loss"]["use_ranking"]:
+        losses["rank"] = RankingLoss(
+            margin=cfg["loss"]["ranking"]["margin"],
+            pairs_per_delta={int(k): v for k, v in cfg["loss"]["ranking"]["pairs_per_delta"].items()},
+            seed=cfg["seed"],
+        )
     return losses
 
 
@@ -124,14 +134,21 @@ def forward_and_loss(model, images, y, cfg, losses, device):
     components = {}
     pair_stats = {}
 
-    if cfg["model"]["head_type"] == "ce":
+    head_type = cfg["model"]["head_type"]
+
+    if head_type == "ce":
         loss = losses["cls"](out["ce_logits"], y)
         components["cls"] = loss.item()
         return loss, components, pair_stats
 
-    l_ord = losses["ordinal"](out["ordinal_logits"], y)
-    total = cfg["loss"]["lambda_ordinal"] * l_ord
-    components["ordinal"] = l_ord.item()
+    if head_type == "cdw_ce":
+        l_cls = losses["cls"](out["ce_logits"], y)
+        total = cfg["loss"]["lambda_ordinal"] * l_cls
+        components["cdw_ce"] = l_cls.item()
+    else:  # ordinal
+        l_cls = losses["ordinal"](out["ordinal_logits"], y)
+        total = cfg["loss"]["lambda_ordinal"] * l_cls
+        components["ordinal"] = l_cls.item()
 
     if "reg" in losses:
         l_reg = losses["reg"](out["z"], y)

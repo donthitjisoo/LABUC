@@ -49,7 +49,7 @@ class MayoMIL(nn.Module):
         m = cfg["model"]
 
         self.use_mil = bool(m["use_mil"])
-        self.head_type = m["head_type"]  # "ce" or "ordinal"
+        self.head_type = m["head_type"]  # "ce", "cdw_ce", or "ordinal"
 
         if self.use_mil:
             self.mil_pool: Optional[MILPool] = MILPool(
@@ -63,8 +63,19 @@ class MayoMIL(nn.Module):
         self.fusion = FusionMLP(fusion_in, m["fusion_dim"], m["dropout"])
 
         if self.head_type == "ce":
+            # Plain CE baseline: 4-way softmax only, no continuous z, so it's
+            # deliberately NOT combinable with the ranking/regression losses
+            # (those need z) -- see config.py's validate_config.
             self.ce_head = nn.Linear(m["fusion_dim"], 4)
             self.severity_head = None
+            self.ordinal_head = None
+        elif self.head_type == "cdw_ce":
+            # Same 4-way softmax head as "ce", but ALSO exposes a z (like the
+            # ordinal head) so this can be combined with MIL and the
+            # ranking/regression losses in the same ablation matrix as
+            # head_type=="ordinal", not just as a standalone baseline.
+            self.ce_head = nn.Linear(m["fusion_dim"], 4)
+            self.severity_head = nn.Linear(m["fusion_dim"], 1)
             self.ordinal_head = None
         else:
             self.ce_head = None
@@ -95,6 +106,9 @@ class MayoMIL(nn.Module):
 
         if self.head_type == "ce":
             out["ce_logits"] = self.ce_head(h_fused)
+        elif self.head_type == "cdw_ce":
+            out["ce_logits"] = self.ce_head(h_fused)
+            out["z"] = self.severity_head(h_fused)
         else:
             z = self.severity_head(h_fused)
             out["z"] = z

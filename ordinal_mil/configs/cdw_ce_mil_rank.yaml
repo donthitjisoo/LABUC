@@ -1,0 +1,22 @@
+# CDW-CE analog of E (ordinal_mil_rank.yaml): CDW-CE + MIL + ranking. Directly
+# comparable, within this same pipeline/split/backbone, to E's CORAL-cutpoint
+# approach -- the two "full" proposed-model variants differing only in how
+# the primary classification loss encodes ordinality (cumulative thresholds
+# on z vs. distance-weighted softmax).
+experiment_name: E2_cdw_ce_mil_rank
+
+model:
+  head_type: cdw_ce
+  use_mil: true
+  pooling: gated_attention
+  mil_attn_dim: 128
+
+loss:
+  use_ranking: true
+  lambda_ordinal: 1.0
+  lambda_rank: 0.25
+  lambda_reg: 0.15
+  cdw_alpha: 5.0
+  ranking:
+    margin: 0.3
+    pairs_per_delta: {1: 12, 2: 6, 3: 3}

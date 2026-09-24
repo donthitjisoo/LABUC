@@ -1,0 +1,16 @@
+# CDW-CE analog of D (ordinal_mil.yaml): CDW-CE + gated-attention MIL, no
+# ranking yet -- isolates MIL's contribution under CDW-CE the same way D
+# isolates it under the CORAL ordinal loss.
+experiment_name: D2_cdw_ce_mil
+
+model:
+  head_type: cdw_ce
+  use_mil: true
+  pooling: gated_attention
+  mil_attn_dim: 128
+
+loss:
+  use_ranking: false
+  lambda_ordinal: 1.0
+  lambda_reg: 0.15
+  cdw_alpha: 5.0

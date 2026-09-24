@@ -62,6 +62,44 @@ class OrdinalCoralLoss(nn.Module):
         return per_sample.mean()
 
 
+class CDWCELoss(nn.Module):
+    """Class-Distance-Weighted Cross-Entropy (de la Torre et al. 2018;
+    used for LIMUC MES grading by Polat et al.'s CDW-CE baseline).
+
+    Plain K-way CE only maximizes p_y; it doesn't care WHERE the rest of the
+    probability mass lands. CDW-CE additionally penalizes mass placed on
+    classes far from the true one more than mass on nearby ones, weighted by
+    |i-y|^alpha:
+
+        L = - sum_{i != y} |i - y|^alpha * log(1 - p_i)
+
+    (the i==y term has weight 0 and is excluded explicitly, rather than
+    relying on 0 * log(1-p_y) -- if p_y -> 1 that product is 0 * -inf = NaN
+    in floating point, so it must be dropped from the sum, not just weighted
+    to zero.)
+    """
+
+    def __init__(self, num_classes: int = NUM_CLASSES, alpha: float = 5.0,
+                 class_weights: Optional[torch.Tensor] = None, eps: float = 1e-7):
+        super().__init__()
+        self.alpha = alpha
+        self.eps = eps
+        self.register_buffer("class_weights", class_weights, persistent=False)
+        self.register_buffer("class_range", torch.arange(num_classes, dtype=torch.float32), persistent=False)
+
+    def forward(self, logits: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        p = F.softmax(logits, dim=1)  # [B, K]
+        y_float = y.float().unsqueeze(1)  # [B, 1]
+        dist = (self.class_range.unsqueeze(0) - y_float).abs() ** self.alpha  # [B, K]
+        not_true_class = self.class_range.unsqueeze(0) != y_float             # [B, K] bool
+        log_term = torch.log(torch.clamp(1 - p, min=self.eps))
+
+        per_sample = -(dist * log_term * not_true_class).sum(dim=1)  # [B]
+        if self.class_weights is not None:
+            per_sample = per_sample * self.class_weights[y]
+        return per_sample.mean()
+
+
 class WeightedCELoss(nn.Module):
     """Plain 4-way cross-entropy for Baseline A, with the same class-weighting
     machinery as the ordinal loss for a fair comparison."""
