@@ -39,6 +39,9 @@ def main():
     parser.add_argument("--checkpoint", required=True, help="best.pt from train.py")
     parser.add_argument("--output-dir", default=None, help="Defaults to the checkpoint's directory.")
     parser.add_argument("--n-boot", type=int, default=1000)
+    parser.add_argument("--save-attention", action="store_true",
+                         help="Also save per-image MIL attention weights (attention.npz) for "
+                              "use_mil configs (D/E) -- needed by visualize_attention.py.")
     args = parser.parse_args()
 
     device = get_device()
@@ -57,7 +60,10 @@ def main():
         shuffle=False, num_workers=cfg["data"]["num_workers"],
     )
 
-    result = run_inference(model, test_loader, device)
+    capture_attn = args.save_attention and cfg["model"]["use_mil"]
+    if args.save_attention and not cfg["model"]["use_mil"]:
+        print("--save-attention given but this config has use_mil=False -- no attention to save.")
+    result = run_inference(model, test_loader, device, capture_attn=capture_attn)
     head_type = cfg["model"]["head_type"]
     y_pred_default = classify_default(result, head_type)
 
@@ -100,6 +106,22 @@ def main():
     pred_path = output_dir / "test_predictions.csv"
     pred_df.to_csv(pred_path, index=False)
     print(f"\nSaved per-image predictions to {pred_path}")
+
+    if capture_attn and "attn" in result:
+        attn_path = output_dir / "attention.npz"
+        np.savez(
+            attn_path,
+            attn=result["attn"],            # [N, num_patches]
+            grid_hw=result["grid_hw"],       # (grid_h, grid_w)
+            path=result["path"],
+            patient_id=result["patient_id"],
+            y_true=result["y_true"],
+            y_pred=y_pred_for_csv,
+            z=result.get("z"),
+            probs=result.get("probs"),
+            image_size=np.array(cfg["data"]["image_size"]),
+        )
+        print(f"Saved per-image attention weights to {attn_path}")
 
     # Patient-cluster bootstrap CIs (primary uncertainty estimate -- images
     # from the same patient are not independent).
