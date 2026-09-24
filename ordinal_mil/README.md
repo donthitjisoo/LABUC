@@ -87,6 +87,15 @@ z = severity scalar   ordinal cutpoint head
 No clinical concept annotations required or used — LIMUC doesn't ship them,
 so no head in the current model depends on them.
 
+**Backbone is a plain config choice** — `backbone.name: dinov2_vits14_reg`
+(default) or `backbone.name: endovit`, on any config, not just the two
+dedicated variant files above. `data.image_size` must be divisible by
+whichever backbone's patch size (14 for DINOv2, 16 for EndoViT) — this is
+now derived automatically from `backbone.name`
+(`src/utils/backbone_specs.py`) and checked at config-load time, so pointing
+an existing 294×364-style config at a different-patch-size backbone fails
+fast with a clear error instead of a confusing shape mismatch mid-training.
+
 ## Ablation table
 
 | Config | Ordinal | MIL | Rank | File |
@@ -97,6 +106,7 @@ so no head in the current model depends on them.
 | D — Ordinal + MIL | ✓ | ✓ | ✗ | `configs/ordinal_mil.yaml` |
 | **E — Ordinal + MIL + rank (proposed)** | ✓ | ✓ | ✓ | `configs/ordinal_mil_rank.yaml` |
 | E, native-resolution variant | ✓ | ✓ | ✓ | `configs/ordinal_mil_rank_native_res.yaml` (294×364, 546 patches vs 224×224's 256) |
+| E, EndoViT-backbone variant | ✓ | ✓ | ✓ | `configs/ordinal_mil_rank_endovit.yaml` (domain-pretrained endoscopy ViT-B/16 instead of generic DINOv2 ViT-S/14-reg) |
 | B2 — CDW-CE (analog of B) | ✓ (CDW-CE, not CORAL) | ✗ | ✗ | `configs/cdw_ce.yaml` |
 | D2 — CDW-CE + MIL (analog of D) | ✓ | ✓ | ✗ | `configs/cdw_ce_mil.yaml` |
 | E2 — CDW-CE + MIL + rank (analog of E) | ✓ | ✓ | ✓ | `configs/cdw_ce_mil_rank.yaml` |
