@@ -94,8 +94,12 @@ def main():
         "true_mayo": result["y_true"],
         "predicted_mayo": y_pred_for_csv,
     })
+    # z and probs are captured independently -- head_type=="cdw_ce" has z
+    # (from its auxiliary severity head) but no probs (no ordinal_logits to
+    # take a sigmoid of; it classifies via ce_logits argmax instead).
     if "z" in result:
         pred_df["severity_z"] = result["z"]
+    if "probs" in result:
         pred_df["prob_gt0"] = result["probs"][:, 0]
         pred_df["prob_gt1"] = result["probs"][:, 1]
         pred_df["prob_gt2"] = result["probs"][:, 2]
@@ -109,18 +113,24 @@ def main():
 
     if capture_attn and "attn" in result:
         attn_path = output_dir / "attention.npz"
-        np.savez(
-            attn_path,
-            attn=result["attn"],            # [N, num_patches]
-            grid_hw=result["grid_hw"],       # (grid_h, grid_w)
-            path=result["path"],
-            patient_id=result["patient_id"],
-            y_true=result["y_true"],
-            y_pred=y_pred_for_csv,
-            z=result.get("z"),
-            probs=result.get("probs"),
-            image_size=np.array(cfg["data"]["image_size"]),
-        )
+        # Only include z/probs keys when they actually exist -- np.savez(key=None)
+        # doesn't omit the key, it silently stores a 0-d object array containing
+        # None, which would make visualize_attention.py's `"z" in data.files`
+        # check pass and then fail trying to index a 0-d array.
+        attn_arrays = {
+            "attn": result["attn"],            # [N, num_patches]
+            "grid_hw": result["grid_hw"],       # (grid_h, grid_w)
+            "path": result["path"],
+            "patient_id": result["patient_id"],
+            "y_true": result["y_true"],
+            "y_pred": y_pred_for_csv,
+            "image_size": np.array(cfg["data"]["image_size"]),
+        }
+        if "z" in result:
+            attn_arrays["z"] = result["z"]
+        if "probs" in result:
+            attn_arrays["probs"] = result["probs"]
+        np.savez(attn_path, **attn_arrays)
         print(f"Saved per-image attention weights to {attn_path}")
 
     # Patient-cluster bootstrap CIs (primary uncertainty estimate -- images
