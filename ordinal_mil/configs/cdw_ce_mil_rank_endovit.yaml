@@ -1,0 +1,24 @@
+# Backbone ablation companion to E2 (cdw_ce_mil_rank.yaml): identical
+# CDW-CE + MIL + rank model/loss config, EndoViT backbone instead of
+# DINOv2. Completes the 2x2 loss-x-backbone grid for the "full" proposed
+# model shape (CORAL/CDW-CE x DINOv2/EndoViT).
+experiment_name: E2_cdw_ce_mil_rank_endovit
+
+backbone:
+  name: endovit
+
+model:
+  head_type: cdw_ce
+  use_mil: true
+  pooling: gated_attention
+  mil_attn_dim: 128
+
+loss:
+  use_ranking: true
+  lambda_ordinal: 1.0
+  lambda_rank: 0.25
+  lambda_reg: 0.15
+  cdw_alpha: 5.0
+  ranking:
+    margin: 0.3
+    pairs_per_delta: {1: 12, 2: 6, 3: 3}

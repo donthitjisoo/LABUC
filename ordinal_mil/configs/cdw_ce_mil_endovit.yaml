@@ -1,0 +1,18 @@
+# Backbone ablation companion to D2 (cdw_ce_mil.yaml): identical CDW-CE +
+# MIL model/loss config, EndoViT backbone instead of DINOv2.
+experiment_name: D2_cdw_ce_mil_endovit
+
+backbone:
+  name: endovit
+
+model:
+  head_type: cdw_ce
+  use_mil: true
+  pooling: gated_attention
+  mil_attn_dim: 128
+
+loss:
+  use_ranking: false
+  lambda_ordinal: 1.0
+  lambda_reg: 0.15
+  cdw_alpha: 5.0

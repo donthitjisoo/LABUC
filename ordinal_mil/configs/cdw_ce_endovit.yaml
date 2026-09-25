@@ -1,0 +1,17 @@
+# Backbone ablation companion to B2 (cdw_ce.yaml): identical CDW-CE
+# model/loss config, EndoViT backbone instead of DINOv2. Part of the same
+# DINOv2-vs-EndoViT check as the A-E ladder, but for the CDW-CE loss family.
+experiment_name: B2_cdw_ce_endovit
+
+backbone:
+  name: endovit
+
+model:
+  head_type: cdw_ce
+  use_mil: false
+
+loss:
+  use_ranking: false
+  lambda_ordinal: 1.0  # weight on CDW-CE itself
+  lambda_reg: 0.15
+  cdw_alpha: 5.0
