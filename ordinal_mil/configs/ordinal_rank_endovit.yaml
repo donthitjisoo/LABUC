@@ -1,0 +1,20 @@
+# Backbone ablation companion to C (ordinal_rank.yaml): identical model/loss
+# config, EndoViT backbone instead of DINOv2.
+experiment_name: C_ordinal_rank_endovit
+
+backbone:
+  name: endovit
+
+model:
+  head_type: ordinal
+  ordinal_head_type: coral
+  use_mil: false
+
+loss:
+  use_ranking: true
+  lambda_ordinal: 1.0
+  lambda_rank: 0.25
+  lambda_reg: 0.15
+  ranking:
+    margin: 0.3
+    pairs_per_delta: {1: 12, 2: 6, 3: 3}

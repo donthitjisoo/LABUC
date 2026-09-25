@@ -106,10 +106,27 @@ fast with a clear error instead of a confusing shape mismatch mid-training.
 | D — Ordinal + MIL | ✓ | ✓ | ✗ | `configs/ordinal_mil.yaml` |
 | **E — Ordinal + MIL + rank (proposed)** | ✓ | ✓ | ✓ | `configs/ordinal_mil_rank.yaml` |
 | E, native-resolution variant | ✓ | ✓ | ✓ | `configs/ordinal_mil_rank_native_res.yaml` (294×364, 546 patches vs 224×224's 256) |
-| E, EndoViT-backbone variant | ✓ | ✓ | ✓ | `configs/ordinal_mil_rank_endovit.yaml` (domain-pretrained endoscopy ViT-B/16 instead of generic DINOv2 ViT-S/14-reg) |
 | B2 — CDW-CE (analog of B) | ✓ (CDW-CE, not CORAL) | ✗ | ✗ | `configs/cdw_ce.yaml` |
 | D2 — CDW-CE + MIL (analog of D) | ✓ | ✓ | ✗ | `configs/cdw_ce_mil.yaml` |
 | E2 — CDW-CE + MIL + rank (analog of E) | ✓ | ✓ | ✓ | `configs/cdw_ce_mil_rank.yaml` |
+
+**Full A–E ladder repeated under EndoViT** (`configs/*_endovit.yaml`) — a
+backbone comparison, not a loss comparison: identical model/loss config to
+A/B/C/D/E respectively, DINOv2 swapped for EndoViT (domain-pretrained on GI
+endoscopy images, vs. DINOv2's generic natural-image pretraining), backbone
+frozen in both cases (`backbone.freeze: true` is the default for every
+config here, unchanged). The point isn't just "is EndoViT's E better than
+DINOv2's E" — it's whether the whole A→E *story* (does MIL fix MES2
+sensitivity, does ranking help, etc.) replicates under a different backbone,
+or was somehow specific to DINOv2.
+
+| Config | File |
+|---|---|
+| A, EndoViT | `configs/baseline_ce_endovit.yaml` |
+| B, EndoViT | `configs/ordinal_endovit.yaml` |
+| C, EndoViT | `configs/ordinal_rank_endovit.yaml` |
+| D, EndoViT | `configs/ordinal_mil_endovit.yaml` |
+| E, EndoViT | `configs/ordinal_mil_rank_endovit.yaml` |
 
 **CDW-CE** (class-distance-weighted cross-entropy, de la Torre et al. 2018,
 used for LIMUC MES grading in Polat et al.'s baseline) is now a third
