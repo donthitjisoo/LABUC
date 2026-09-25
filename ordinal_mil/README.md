@@ -127,6 +127,14 @@ or was somehow specific to DINOv2.
 | C, EndoViT | `configs/ordinal_rank_endovit.yaml` |
 | D, EndoViT | `configs/ordinal_mil_endovit.yaml` |
 | E, EndoViT | `configs/ordinal_mil_rank_endovit.yaml` |
+| B2, EndoViT | `configs/cdw_ce_endovit.yaml` |
+| D2, EndoViT | `configs/cdw_ce_mil_endovit.yaml` |
+| E2, EndoViT | `configs/cdw_ce_mil_rank_endovit.yaml` |
+
+The last three complete the loss × backbone grid (CORAL/CDW-CE ×
+DINOv2/EndoViT) for the "full" proposed-model shape, so CDW-CE's edge over
+CORAL (if any, per the B/D/E vs B2/D2/E2 comparison) can also be checked
+under EndoViT rather than only DINOv2.
 
 **CDW-CE** (class-distance-weighted cross-entropy, de la Torre et al. 2018,
 used for LIMUC MES grading in Polat et al.'s baseline) is now a third
