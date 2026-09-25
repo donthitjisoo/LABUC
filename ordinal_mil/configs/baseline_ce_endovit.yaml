@@ -1,0 +1,15 @@
+# Backbone ablation companion to A (baseline_ce.yaml): identical model/loss
+# config, EndoViT backbone instead of DINOv2. Part of the full A-E ladder
+# repeated under EndoViT, so the ladder's story (does MIL/ranking help)
+# can be checked for backbone-specificity, not just tested on DINOv2.
+experiment_name: A_baseline_ce_endovit
+
+backbone:
+  name: endovit
+
+model:
+  head_type: ce
+  use_mil: false
+
+loss:
+  use_ranking: false
