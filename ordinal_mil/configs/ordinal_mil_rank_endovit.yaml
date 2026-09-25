@@ -1,0 +1,34 @@
+# Backbone ablation companion to E (ordinal_mil_rank.yaml): identical
+# model/loss config, swapping the DINOv2 ViT-S/14-reg backbone for EndoViT
+# (ViT-B/16, MAE-pretrained on GI endoscopy images -- domain-specific rather
+# than DINOv2's generic natural-image pretraining). Compare directly against
+# ordinal_mil_rank.yaml's result -- does endoscopy-domain pretraining beat
+# generic self-supervised pretraining here?
+#
+# image_size stays 224x224: divisible by both patch14 (DINOv2) and patch16
+# (EndoViT), so no change needed there for this comparison. (The
+# native-resolution variant is patch14-specific -- see the note in
+# ordinal_mil_rank_native_res.yaml if you want an EndoViT native-res config
+# too; it would need a different image_size, divisible by 16, e.g. LIMUC's
+# native ~352x288 which happens to already be divisible by 16 with no
+# padding needed at all.)
+experiment_name: E_ordinal_mil_rank_endovit
+
+backbone:
+  name: endovit
+
+model:
+  head_type: ordinal
+  ordinal_head_type: coral
+  use_mil: true
+  pooling: gated_attention
+  mil_attn_dim: 128
+
+loss:
+  use_ranking: true
+  lambda_ordinal: 1.0
+  lambda_rank: 0.25
+  lambda_reg: 0.15
+  ranking:
+    margin: 0.3
+    pairs_per_delta: {1: 12, 2: 6, 3: 3}

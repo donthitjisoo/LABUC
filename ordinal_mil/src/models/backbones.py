@@ -14,6 +14,10 @@ from typing import Tuple
 import torch
 import torch.nn as nn
 
+from ..utils.backbone_specs import resolve_patch_size
+
+__all__ = ["BackboneWrapper", "DINOv2Backbone", "EndoViTBackbone", "build_backbone", "resolve_patch_size"]
+
 
 class BackboneWrapper(nn.Module):
     embed_dim: int
@@ -107,10 +111,11 @@ class EndoViTBackbone(BackboneWrapper):
 
 def build_backbone(cfg: dict) -> BackboneWrapper:
     name = cfg["name"]
+    patch_size = resolve_patch_size(name)
     if name.startswith("dinov2"):
-        backbone: BackboneWrapper = DINOv2Backbone(name=name, patch_size=cfg.get("patch_size", 14))
+        backbone: BackboneWrapper = DINOv2Backbone(name=name, patch_size=patch_size)
     elif name == "endovit":
-        backbone = EndoViTBackbone(patch_size=cfg.get("patch_size", 16))
+        backbone = EndoViTBackbone(patch_size=patch_size)
     else:
         raise ValueError(f"Unknown backbone: {name}")
 

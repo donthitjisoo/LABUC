@@ -12,6 +12,8 @@ from typing import Any, Dict
 
 import yaml
 
+from .backbone_specs import resolve_patch_size
+
 DEFAULTS: Dict[str, Any] = {
     "experiment_name": "unnamed",
     "seed": 42,
@@ -30,8 +32,15 @@ DEFAULTS: Dict[str, Any] = {
         # value as `seed` so existing configs are unaffected unless this is
         # set explicitly.
         "split_seed": 42,
-        "image_size": [224, 224],  # [H, W], must each be divisible by patch_size
-        "patch_size": 14,
+        # [H, W]; must each be divisible by the SELECTED BACKBONE's patch
+        # size (see models.backbones.resolve_patch_size -- 14 for DINOv2, 16
+        # for EndoViT). There's deliberately no separate data.patch_size
+        # field to set here: that used to exist as an independently-defaulted
+        # number disconnected from what the backbone actually needs, which
+        # could silently pass validation while being wrong (e.g. switching
+        # backbone.name to "endovit" on a size only valid for patch14). The
+        # backbone is the single source of truth for its own patch size.
+        "image_size": [224, 224],
         "num_workers": 4,
     },
     "sampler": {
@@ -107,11 +116,13 @@ def load_config(path: str | Path) -> Dict[str, Any]:
 
 def validate_config(cfg: Dict[str, Any]) -> None:
     h, w = cfg["data"]["image_size"]
-    p = cfg["data"]["patch_size"]
+    # Derived from backbone.name, not a separately-set field -- see the
+    # comment on data.image_size above for why.
+    p = resolve_patch_size(cfg["backbone"]["name"])
     if h % p != 0 or w % p != 0:
         raise ValueError(
-            f"image_size {(h, w)} must be divisible by patch_size {p} "
-            f"(got remainders {h % p}, {w % p})."
+            f"image_size {(h, w)} must be divisible by backbone '{cfg['backbone']['name']}'s "
+            f"patch size {p} (got remainders {h % p}, {w % p})."
         )
     if cfg["model"]["head_type"] not in ("ce", "cdw_ce", "ordinal"):
         raise ValueError(f"Unknown head_type: {cfg['model']['head_type']}")
