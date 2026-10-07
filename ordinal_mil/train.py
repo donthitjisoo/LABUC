@@ -49,8 +49,10 @@ def build_records(cfg: dict):
 
 def build_dataloaders(cfg: dict, train_records, val_records):
     image_size = cfg["data"]["image_size"]
-    train_tf = build_transform(image_size, train=True)
-    val_tf = build_transform(image_size, train=False)
+    norm = cfg["data"]["normalization"]  # resolved from backbone.name by load_config
+    print(f"Input normalization for backbone '{norm['source']}': mean={norm['mean']} std={norm['std']}")
+    train_tf = build_transform(image_size, train=True, mean=norm["mean"], std=norm["std"])
+    val_tf = build_transform(image_size, train=False, mean=norm["mean"], std=norm["std"])
     train_ds = LimucMILDataset(train_records, train_tf)
     val_ds = LimucMILDataset(val_records, val_tf)
 

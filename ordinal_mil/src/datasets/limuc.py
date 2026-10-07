@@ -33,9 +33,6 @@ MAYO_CLASS_RE = re.compile(r"mayo[ _-]?([0-3])\b", re.IGNORECASE)
 LEADING_DIGITS_RE = re.compile(r"^(\d+)")
 NUM_CLASSES = 4
 
-IMAGENET_MEAN = [0.485, 0.456, 0.406]
-IMAGENET_STD = [0.229, 0.224, 0.225]
-
 
 class LeakageError(RuntimeError):
     """Raised when a patient id appears in more than one data split."""
@@ -235,7 +232,14 @@ class ResizeAndPadToMultiple:
         return TF.pad(img, [left, top, right, bottom], fill=self.fill)
 
 
-def build_transform(image_size: Tuple[int, int], train: bool) -> T.Compose:
+def build_transform(
+    image_size: Tuple[int, int], train: bool, mean: Sequence[float], std: Sequence[float],
+) -> T.Compose:
+    """mean/std are required, with no default on purpose: they must be the
+    statistics the selected backbone was pretrained with (see
+    utils/backbone_specs.resolve_norm_stats), and a silent ImageNet default
+    here is exactly how EndoViT ended up being fed the wrong normalization.
+    """
     ops = [ResizeAndPadToMultiple(tuple(image_size))]
     if train:
         ops += [
@@ -245,7 +249,7 @@ def build_transform(image_size: Tuple[int, int], train: bool) -> T.Compose:
             T.ColorJitter(brightness=0.15, contrast=0.15, saturation=0.1),
             T.GaussianBlur(kernel_size=3, sigma=(0.1, 1.0)),
         ]
-    ops += [T.ToTensor(), T.Normalize(IMAGENET_MEAN, IMAGENET_STD)]
+    ops += [T.ToTensor(), T.Normalize(list(mean), list(std))]
     return T.Compose(ops)
 
 

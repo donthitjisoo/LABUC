@@ -8,11 +8,11 @@ from __future__ import annotations
 
 import copy
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
 
-from .backbone_specs import resolve_patch_size
+from .backbone_specs import IMAGENET_MEAN, IMAGENET_STD, resolve_norm_stats, resolve_patch_size
 
 DEFAULTS: Dict[str, Any] = {
     "experiment_name": "unnamed",
@@ -33,21 +33,27 @@ DEFAULTS: Dict[str, Any] = {
         # set explicitly.
         "split_seed": 42,
         # [H, W]; must each be divisible by the SELECTED BACKBONE's patch
-        # size (see models.backbones.resolve_patch_size -- 14 for DINOv2, 16
-        # for EndoViT). There's deliberately no separate data.patch_size
+        # size (see utils/backbone_specs.resolve_patch_size -- 14 for DINOv2,
+        # 16 for EndoViT and DINOv3). There's deliberately no separate data.patch_size
         # field to set here: that used to exist as an independently-defaulted
         # number disconnected from what the backbone actually needs, which
         # could silently pass validation while being wrong (e.g. switching
         # backbone.name to "endovit" on a size only valid for patch14). The
         # backbone is the single source of truth for its own patch size.
         "image_size": [224, 224],
+        # NOTE: there is no `normalization` key to set here either, for the
+        # same reason. load_config() fills data.normalization = {mean, std,
+        # source} from backbone.name, and it is saved inside the checkpoint
+        # so evaluation always reuses exactly what training used.
         "num_workers": 4,
     },
     "sampler": {
         "type": "patient_aware_balanced",  # "patient_aware_balanced" or "random"
     },
     "backbone": {
-        "name": "dinov2_vits14_reg",  # or "endovit"
+        # "dinov2_*" (torch.hub), "endovit", or a "dinov3_*" key of
+        # backbone_specs.DINOV3_HF_IDS (e.g. "dinov3_vits16").
+        "name": "dinov2_vits14_reg",
         "freeze": True,
         "unfreeze_last_n_blocks": 0,
     },
@@ -109,9 +115,52 @@ def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any
 def load_config(path: str | Path) -> Dict[str, Any]:
     with open(path) as f:
         user_cfg = yaml.safe_load(f) or {}
+    if "normalization" in (user_cfg.get("data") or {}):
+        raise ValueError(
+            "data.normalization must not be set in a config: it is derived from "
+            "backbone.name so the input statistics can never drift from the backbone "
+            "they belong to. Remove the key."
+        )
     cfg = _deep_merge(DEFAULTS, user_cfg)
     validate_config(cfg)
+    mean, std = resolve_norm_stats(cfg["backbone"]["name"])
+    cfg["data"]["normalization"] = {
+        "mean": list(mean), "std": list(std), "source": cfg["backbone"]["name"],
+    }
     return cfg
+
+
+def normalization_for_checkpoint(cfg: Dict[str, Any]) -> Tuple[List[float], List[float], Optional[str]]:
+    """(mean, std, warning) to evaluate a checkpoint with, given the config
+    stored inside it.
+
+    Evaluation must reuse the statistics the checkpoint was TRAINED with, even
+    when those were wrong -- a head trained on one input distribution and
+    evaluated on another gives meaningless numbers. Checkpoints written before
+    data.normalization existed were all trained on ImageNet-normalized input
+    regardless of backbone, so that is what they get here, with a warning that
+    says whether that was actually right for their backbone.
+    """
+    norm = cfg["data"].get("normalization")
+    if norm is not None:
+        return list(norm["mean"]), list(norm["std"]), None
+
+    name = cfg["backbone"]["name"]
+    expected_mean, expected_std = resolve_norm_stats(name)
+    was_correct = (tuple(expected_mean), tuple(expected_std)) == (IMAGENET_MEAN, IMAGENET_STD)
+    if was_correct:
+        warning = (
+            f"Checkpoint predates per-backbone normalization; it was trained with ImageNet "
+            f"statistics, which is correct for '{name}'. Evaluating with the same."
+        )
+    else:
+        warning = (
+            f"Checkpoint predates per-backbone normalization: it was trained with ImageNet "
+            f"statistics, but '{name}' expects mean={list(expected_mean)} std={list(expected_std)}. "
+            f"Evaluating with ImageNet statistics to stay consistent with how it was trained -- "
+            f"but this run's numbers come from a mis-normalized backbone. RETRAIN to fix."
+        )
+    return list(IMAGENET_MEAN), list(IMAGENET_STD), warning
 
 
 def validate_config(cfg: Dict[str, Any]) -> None:

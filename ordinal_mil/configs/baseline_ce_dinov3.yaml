@@ -1,0 +1,17 @@
+# Backbone ablation companion to A (baseline_ce.yaml): identical model/loss
+# config, DINOv3 ViT-S/16 backbone instead of DINOv2 ViT-S/14-reg. Both are
+# 21M parameters, so this is the size-matched DINOv2 -> DINOv3 comparison.
+# Any other DINOv3 size is a one-word change of backbone.name (the keys of
+# src/utils/backbone_specs.DINOV3_HF_IDS) -- change experiment_name with it
+# so the runs don't overwrite each other.
+experiment_name: A_baseline_ce_dinov3_vits16
+
+backbone:
+  name: dinov3_vits16
+
+model:
+  head_type: ce
+  use_mil: false
+
+loss:
+  use_ranking: false
