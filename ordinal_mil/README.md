@@ -62,7 +62,7 @@ config A has no thresholds to tune, so it's its one number).
 ```
 Endoscopic Image
        |
-DINOv2 ViT-S/14-reg or EndoViT  (frozen by default)
+DINOv2 ViT-S/14-reg, EndoViT, or DINOv3  (frozen by default)
        |
    ------------------------------
    |                            |
@@ -87,14 +87,36 @@ z = severity scalar   ordinal cutpoint head
 No clinical concept annotations required or used — LIMUC doesn't ship them,
 so no head in the current model depends on them.
 
-**Backbone is a plain config choice** — `backbone.name: dinov2_vits14_reg`
-(default) or `backbone.name: endovit`, on any config, not just the two
-dedicated variant files above. `data.image_size` must be divisible by
-whichever backbone's patch size (14 for DINOv2, 16 for EndoViT) — this is
-now derived automatically from `backbone.name`
-(`src/utils/backbone_specs.py`) and checked at config-load time, so pointing
-an existing 294×364-style config at a different-patch-size backbone fails
-fast with a clear error instead of a confusing shape mismatch mid-training.
+**Backbone is a plain config choice** — `backbone.name`, on any config:
+
+| `backbone.name` | Model | Patch | Input mean / std | Access |
+|---|---|---|---|---|
+| `dinov2_vits14_reg` (default) | DINOv2 ViT-S/14 + registers, 21M | 14 | ImageNet | public (torch.hub) |
+| `endovit` | EndoViT ViT-B/16 (MAE on GI endoscopy), 86M | 16 | EndoViT's own: (0.3464, 0.2280, 0.2228) / (0.2520, 0.2128, 0.2093) | public |
+| `dinov3_vits16`, `dinov3_vits16plus`, `dinov3_vitb16`, `dinov3_vitl16`, `dinov3_vith16plus`, `dinov3_vit7b16` | DINOv3 ViT, LVD-1689M web weights, 21M–6.7B | 16 | ImageNet | gated: accept the license on each model's Hugging Face page and log in; needs `transformers>=4.56` |
+
+Patch size **and input normalization** are properties of the pretrained
+checkpoint, not free knobs, so both are derived from `backbone.name` in one
+place (`src/utils/backbone_specs.py`) and nowhere else:
+
+- `data.image_size` must be divisible by the backbone's patch size; checked
+  at config-load time, so a 294×364-style config pointed at a patch-16
+  backbone fails fast instead of with a shape mismatch mid-training.
+- The data transform normalizes with that backbone's own statistics.
+  `load_config` writes them to `data.normalization`, `train.py` prints them
+  at startup, and they are saved inside the checkpoint so `evaluate.py`
+  always reuses exactly what training used. Setting `data.normalization` by
+  hand in a config is rejected.
+
+> **EndoViT runs trained before this fix are invalid as a backbone
+> comparison.** `build_transform` used to hard-code ImageNet statistics for
+> every backbone, so EndoViT was fed inputs roughly 0.6–1.0σ off from what
+> it was pretrained on (a pixel at EndoViT's dataset mean arrived as
+> (−0.61, −1.02, −0.81) instead of (0, 0, 0)). DINOv2 runs are unaffected —
+> ImageNet statistics are correct for it. `evaluate.py` still evaluates such
+> an old EndoViT checkpoint with ImageNet statistics (the head was trained on
+> them, so anything else would be meaningless) but prints a warning saying
+> so. **Retrain all `*_endovit` configs** to get a valid EndoViT result.
 
 ## Ablation table
 
@@ -135,6 +157,27 @@ The last three complete the loss × backbone grid (CORAL/CDW-CE ×
 DINOv2/EndoViT) for the "full" proposed-model shape, so CDW-CE's edge over
 CORAL (if any, per the B/D/E vs B2/D2/E2 comparison) can also be checked
 under EndoViT rather than only DINOv2.
+
+**The same ladder under DINOv3** (`configs/*_dinov3.yaml`) — again identical
+to A/B/C/D/E/B2/D2/E2 in every model/loss setting, backbone frozen. These
+use `dinov3_vits16` (ViT-S/16, 21M parameters) so the comparison against the
+DINOv2 ViT-S/14-reg default (also 21M) is size-matched: same parameter count,
+different pretraining generation. One difference remains and is inherent to
+the checkpoints: patch 16 instead of 14, so a 224×224 image gives a 14×14
+grid (196 patch tokens) rather than DINOv2's 16×16 (256). Any other size in
+the table above is a one-word change of `backbone.name` (change
+`experiment_name` with it so runs don't overwrite each other).
+
+| Config | File | Run name |
+|---|---|---|
+| A, DINOv3 | `configs/baseline_ce_dinov3.yaml` | `A_baseline_ce_dinov3_vits16` |
+| B, DINOv3 | `configs/ordinal_dinov3.yaml` | `B_ordinal_dinov3_vits16` |
+| C, DINOv3 | `configs/ordinal_rank_dinov3.yaml` | `C_ordinal_rank_dinov3_vits16` |
+| D, DINOv3 | `configs/ordinal_mil_dinov3.yaml` | `D_ordinal_mil_dinov3_vits16` |
+| E, DINOv3 | `configs/ordinal_mil_rank_dinov3.yaml` | `E_ordinal_mil_rank_dinov3_vits16` |
+| B2, DINOv3 | `configs/cdw_ce_dinov3.yaml` | `B2_cdw_ce_dinov3_vits16` |
+| D2, DINOv3 | `configs/cdw_ce_mil_dinov3.yaml` | `D2_cdw_ce_mil_dinov3_vits16` |
+| E2, DINOv3 | `configs/cdw_ce_mil_rank_dinov3.yaml` | `E2_cdw_ce_mil_rank_dinov3_vits16` |
 
 **CDW-CE** (class-distance-weighted cross-entropy, de la Torre et al. 2018,
 used for LIMUC MES grading in Polat et al.'s baseline) is now a third

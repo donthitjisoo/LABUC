@@ -1,0 +1,20 @@
+# Backbone ablation companion to B (ordinal.yaml): identical model/loss
+# config, DINOv3 ViT-S/16 backbone instead of DINOv2 ViT-S/14-reg. Both are
+# 21M parameters, so this is the size-matched DINOv2 -> DINOv3 comparison.
+# Any other DINOv3 size is a one-word change of backbone.name (the keys of
+# src/utils/backbone_specs.DINOV3_HF_IDS) -- change experiment_name with it
+# so the runs don't overwrite each other.
+experiment_name: B_ordinal_dinov3_vits16
+
+backbone:
+  name: dinov3_vits16
+
+model:
+  head_type: ordinal
+  ordinal_head_type: coral
+  use_mil: false
+
+loss:
+  use_ranking: false
+  lambda_ordinal: 1.0
+  lambda_reg: 0.15

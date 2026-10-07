@@ -19,6 +19,7 @@ from torch.utils.data import DataLoader
 from src.datasets.limuc import LimucMILDataset, build_transform, load_from_csv, load_from_directory
 from src.metrics.metrics import compute_metrics
 from src.models.mayo_mil import MayoMIL
+from src.utils.config import normalization_for_checkpoint
 from src.utils.inference import classify_default, classify_tuned, run_inference
 from src.utils.patient_bootstrap import patient_cluster_bootstrap
 from src.utils.seed import get_device, seed_everything
@@ -54,7 +55,13 @@ def main():
     model.eval()
 
     test_records = build_test_records(cfg)
-    test_tf = build_transform(cfg["data"]["image_size"], train=False)
+    # Always the statistics this checkpoint was trained with (stored in its
+    # config), never re-derived -- see normalization_for_checkpoint.
+    mean, std, norm_warning = normalization_for_checkpoint(cfg)
+    if norm_warning:
+        print(f"\nWARNING: {norm_warning}\n")
+    print(f"Input normalization: mean={mean} std={std}")
+    test_tf = build_transform(cfg["data"]["image_size"], train=False, mean=mean, std=std)
     test_loader = DataLoader(
         LimucMILDataset(test_records, test_tf), batch_size=cfg["train"]["batch_size"],
         shuffle=False, num_workers=cfg["data"]["num_workers"],

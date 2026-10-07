@@ -1,0 +1,22 @@
+# Backbone ablation companion to D2 (cdw_ce_mil.yaml): identical model/loss
+# config, DINOv3 ViT-S/16 backbone instead of DINOv2 ViT-S/14-reg. Both are
+# 21M parameters, so this is the size-matched DINOv2 -> DINOv3 comparison.
+# Any other DINOv3 size is a one-word change of backbone.name (the keys of
+# src/utils/backbone_specs.DINOV3_HF_IDS) -- change experiment_name with it
+# so the runs don't overwrite each other.
+experiment_name: D2_cdw_ce_mil_dinov3_vits16
+
+backbone:
+  name: dinov3_vits16
+
+model:
+  head_type: cdw_ce
+  use_mil: true
+  pooling: gated_attention
+  mil_attn_dim: 128
+
+loss:
+  use_ranking: false
+  lambda_ordinal: 1.0
+  lambda_reg: 0.15
+  cdw_alpha: 5.0
