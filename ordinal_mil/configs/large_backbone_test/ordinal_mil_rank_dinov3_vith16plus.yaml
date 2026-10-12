@@ -1,0 +1,32 @@
+# Large-backbone test: config E (ordinal + MIL + rank) on DINOv3 ViT-H+/16 (840M parameters; gated on Hugging Face),
+# backbone frozen. Standalone side test -- not part of the main ablation grid.
+# Differs from ordinal_mil_rank.yaml in the backbone and in the train block below.
+experiment_name: E_ordinal_mil_rank_dinov3_vith16plus
+
+backbone:
+  name: dinov3_vith16plus
+
+model:
+  head_type: ordinal
+  ordinal_head_type: coral
+  use_mil: true
+  pooling: gated_attention
+  mil_attn_dim: 128
+
+loss:
+  use_ranking: true
+  lambda_ordinal: 1.0
+  lambda_rank: 0.25
+  lambda_reg: 0.15
+  ranking:
+    margin: 0.3
+    pairs_per_delta: {1: 12, 2: 6, 3: 3}
+
+train:
+  # Stop only after 50 epochs without a better validation QWK (15 elsewhere).
+  early_stop_patience: 50
+  # Cap raised from 100 so the 50-epoch rule, not the cap, ends the run. The
+  # cosine learning-rate decay therefore spans 200 epochs here.
+  epochs: 200
+  # Own results folder, apart from the A-E / CDW-CE / EndoViT / DINOv3-S runs.
+  log_dir: runs_ordinal_mil/large_backbone_test
